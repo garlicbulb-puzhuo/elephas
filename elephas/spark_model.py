@@ -181,7 +181,7 @@ class SparkModel(object):
         '''
         Train an elephas model.
         '''
-        rdd = rdd.repartition(self.num_workers)
+        # rdd = rdd.repartition(self.num_workers)
         master_url = self.determine_master()
 
         if self.mode in ['asynchronous', 'synchronous', 'hogwild']:
