@@ -54,7 +54,6 @@ class SparkModel(object):
                  master_loss="categorical_crossentropy",
                  master_metrics=None,
                  custom_objects=None,
-                 history_callback=None,
                  *args, **kwargs):
 
 
@@ -78,7 +77,6 @@ class SparkModel(object):
         self.master_loss = master_loss
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
-        self.history_callback = history_callback
 
     @staticmethod
     def determine_master():
@@ -179,7 +177,7 @@ class SparkModel(object):
         return self.master_network.predict_classes(data)
 
     def train(self, rdd, nb_epoch=10, batch_size=32,
-              verbose=0, validation_split=0.1):
+              verbose=0, validation_split=0.1, history_callback=None):
         '''
         Train an elephas model.
         '''
@@ -187,12 +185,12 @@ class SparkModel(object):
         master_url = self.determine_master()
 
         if self.mode in ['asynchronous', 'synchronous', 'hogwild']:
-            self._train(rdd, nb_epoch, batch_size, verbose, validation_split, master_url)
+            self._train(rdd, nb_epoch, batch_size, verbose, validation_split, master_url, history_callback)
         else:
             print("""Choose from one of the modes: asynchronous, synchronous or hogwild""")
 
     def _train(self, rdd, nb_epoch=10, batch_size=32, verbose=0,
-               validation_split=0.1, master_url='localhost:5000'):
+               validation_split=0.1, master_url='localhost:5000', history_callback=None):
         '''
         Protected train method to make wrapping of modes easier
         '''
@@ -206,7 +204,7 @@ class SparkModel(object):
             worker = AsynchronousSparkWorker(
                 yaml, train_config, self.frequency, master_url,
                 self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
-                self.history_callback
+                history_callback
             )
             rdd.mapPartitions(worker.train).collect()
             new_parameters = get_server_weights(master_url)
