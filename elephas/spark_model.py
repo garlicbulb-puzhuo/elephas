@@ -177,7 +177,7 @@ class SparkModel(object):
         return self.master_network.predict_classes(data)
 
     def train(self, rdd, nb_epoch=10, batch_size=32,
-              verbose=0, validation_split=0.1, history_callback=None):
+              verbose=0, validation_split=0.1, use_history_callback=False):
         '''
         Train an elephas model.
         '''
@@ -185,12 +185,12 @@ class SparkModel(object):
         master_url = self.determine_master()
 
         if self.mode in ['asynchronous', 'synchronous', 'hogwild']:
-            self._train(rdd, nb_epoch, batch_size, verbose, validation_split, master_url, history_callback)
+            self._train(rdd, nb_epoch, batch_size, verbose, validation_split, master_url, use_history_callback)
         else:
             print("""Choose from one of the modes: asynchronous, synchronous or hogwild""")
 
     def _train(self, rdd, nb_epoch=10, batch_size=32, verbose=0,
-               validation_split=0.1, master_url='localhost:5000', history_callback=None):
+               validation_split=0.1, master_url='localhost:5000', use_history_callback=False):
         '''
         Protected train method to make wrapping of modes easier
         '''
@@ -204,7 +204,7 @@ class SparkModel(object):
             worker = AsynchronousSparkWorker(
                 yaml, train_config, self.frequency, master_url,
                 self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
-                history_callback
+                use_history_callback
             )
             rdd.mapPartitions(worker.train).collect()
             new_parameters = get_server_weights(master_url)
@@ -223,8 +223,12 @@ class SparkModel(object):
 
 
 class HistoryCallback(object):
-    def on_receive_history(self, history):
+    def __init__(self):
         pass
+
+    def on_receive_history(self, history):
+        # list all data in history
+        print(history.history.keys())
 
 
 class SparkWorker(object):
@@ -263,7 +267,7 @@ class AsynchronousSparkWorker(object):
     '''
     Asynchronous Spark worker. This code will be executed on workers.
     '''
-    def __init__(self, yaml, train_config, frequency, master_url, master_optimizer, master_loss, master_metrics, custom_objects, history_callback=None):
+    def __init__(self, yaml, train_config, frequency, master_url, master_optimizer, master_loss, master_metrics, custom_objects, use_history_callback=False):
         self.yaml = yaml
         self.train_config = train_config
         self.frequency = frequency
@@ -272,7 +276,7 @@ class AsynchronousSparkWorker(object):
         self.master_loss = master_loss
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
-        self.history_callback = history_callback
+        self.use_history_callback = use_history_callback
 
     def train(self, data_iterator):
         '''
@@ -303,8 +307,9 @@ class AsynchronousSparkWorker(object):
                 self.train_config['nb_epoch'] = 1
                 if x_train.shape[0] > batch_size:
                     history = model.fit(x_train, y_train, **self.train_config)
-                    if self.history_callback is not None:
-                        self.history_callback(history)
+                    if self.use_history_callback:
+                        history_callback = HistoryCallback
+                        history_callback.on_receive_history(history)
                 weights_after_training = model.get_weights()
                 deltas = subtract_params(weights_before_training, weights_after_training)
                 put_deltas_to_server(deltas, self.master_url)
