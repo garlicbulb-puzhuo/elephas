@@ -223,7 +223,7 @@ class SparkModel(object):
 
 
 class HistoryCallback(object):
-    def on_receive_history(self, history):
+    def on_receive_history(self, history, metadata):
         pass
 
 
@@ -297,6 +297,8 @@ class AsynchronousSparkWorker(object):
         batches = [(i*batch_size, min(nb_train_sample, (i+1)*batch_size)) for i in range(0, nb_batch)]
 
         if self.frequency == 'epoch':
+            import os
+            import socket
             for epoch in range(nb_epoch):
                 weights_before_training = get_server_weights(self.master_url)
                 model.set_weights(weights_before_training)
@@ -304,7 +306,8 @@ class AsynchronousSparkWorker(object):
                 if x_train.shape[0] > batch_size:
                     history = model.fit(x_train, y_train, **self.train_config)
                     if self.history_callback is not None:
-                        self.history_callback.on_receive_history(history)
+                        metadata = {'hostname': socket.gethostname(), 'pid': os.getpid(), 'epoch': epoch, 'train_sample_size': x_train.shape[0]}
+                        self.history_callback.on_receive_history(history, metadata)
                 weights_after_training = model.get_weights()
                 deltas = subtract_params(weights_before_training, weights_after_training)
                 put_deltas_to_server(deltas, self.master_url)
