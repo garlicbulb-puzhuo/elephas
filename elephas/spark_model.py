@@ -54,6 +54,7 @@ class SparkModel(object):
                  master_loss="categorical_crossentropy",
                  master_metrics=None,
                  custom_objects=None,
+                 master_server_port=None,
                  *args, **kwargs):
 
 
@@ -78,12 +79,24 @@ class SparkModel(object):
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
 
+        if master_server_port is None:
+            self.master_server_port = 5000
+        else:
+            self.master_server_port = master_server_port
+
     @staticmethod
     def determine_master():
         '''
         Get URL of parameter server, running on master
         '''
         master_url = socket.gethostbyname(socket.gethostname()) + ':5000'
+        return master_url
+
+    def determine_master_with_port(self):
+        '''
+        Get URL of parameter server, running on master
+        '''
+        master_url = "%s:%d".format(socket.gethostbyname(socket.gethostname()), self.master_server_port)
         return master_url
 
     def get_train_config(self, nb_epoch, batch_size,
@@ -161,7 +174,7 @@ class SparkModel(object):
                 self.lock.release()
             return 'Update done'
 
-        self.app.run(host='0.0.0.0', debug=True,
+        self.app.run(host='0.0.0.0', debug=True, port=self.master_server_port,
                      threaded=True, use_reloader=False)
 
     def predict(self, data):
@@ -182,7 +195,7 @@ class SparkModel(object):
         Train an elephas model.
         '''
         # rdd = rdd.repartition(self.num_workers)
-        master_url = self.determine_master()
+        master_url = self.determine_master_with_port()
 
         if self.mode in ['asynchronous', 'synchronous', 'hogwild']:
             self._train(rdd, nb_epoch, batch_size, verbose, validation_split, master_url, history_callback)
