@@ -96,7 +96,7 @@ class SparkModel(object):
         '''
         Get URL of parameter server, running on master
         '''
-        master_url = "%s:%d".format(socket.gethostbyname(socket.gethostname()), self.master_server_port)
+        master_url = "{0}:{1}".format(socket.gethostbyname(socket.gethostname()), self.master_server_port)
         return master_url
 
     def get_train_config(self, nb_epoch, batch_size,
