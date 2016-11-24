@@ -315,7 +315,7 @@ class AsynchronousSparkWorker(object):
                 model.set_weights(weights_before_training)
                 self.train_config['nb_epoch'] = 1
                 if x_train.shape[0] > batch_size:
-                    model.fit(x_train, y_train, callbacks=callbacks, **self.train_config)
+                    model.fit(x_train, y_train, callbacks=self.callbacks, **self.train_config)
                 weights_after_training = model.get_weights()
                 deltas = subtract_params(weights_before_training, weights_after_training)
                 put_deltas_to_server(deltas, self.master_url)
