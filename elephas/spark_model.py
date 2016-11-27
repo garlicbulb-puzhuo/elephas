@@ -43,6 +43,11 @@ def put_deltas_to_server(delta, master_url='localhost:5000'):
     return urllib2.urlopen(request).read()
 
 
+class ModelCallback(object):
+    def on_update_parameters(self, spark_model):
+        pass
+
+
 class SparkModel(object):
     '''
     SparkModel is the main abstraction of elephas. Every other model
@@ -55,6 +60,7 @@ class SparkModel(object):
                  master_metrics=None,
                  custom_objects=None,
                  master_server_port=None,
+                 model_callbacks=[],
                  *args, **kwargs):
 
 
@@ -78,6 +84,7 @@ class SparkModel(object):
         self.master_loss = master_loss
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
+        self.model_callbacks = model_callbacks
 
         if master_server_port is None:
             self.master_server_port = 5000
@@ -170,6 +177,11 @@ class SparkModel(object):
                 def empty(a): return a
                 constraints = [empty for x in self.weights]
             self.weights = self.optimizer.get_updates(self.weights, constraints, delta)
+
+            if not self.model_callbacks:
+                for model_callback in self.model_callbacks:
+                    model_callback.on_update_parameters(spark_model=self)
+
             if self.mode == 'asynchronous':
                 self.lock.release()
             return 'Update done'
