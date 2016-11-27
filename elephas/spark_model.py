@@ -242,9 +242,17 @@ class SparkModel(object):
             for delta in deltas:
                 constraints = self.master_network.constraints
                 new_parameters = self.optimizer.get_updates(self.weights, constraints, delta)
-        self.master_network.set_weights(new_parameters)
+
+        self.update_weights(weights=new_parameters)
+
         if self.mode in ['asynchronous', 'hogwild']:
             self.stop_server()
+
+    def update_weights(self, weights=None):
+        if weights is not None:
+            self.master_network.set_weights(weights)
+        else:
+            self.master_network.set_weights(self.weights)
 
 
 class HistoryCallback(object):
