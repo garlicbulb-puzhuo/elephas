@@ -169,6 +169,7 @@ class SparkModel(object):
 
         @app.route('/update', methods=['POST'])
         def update_parameters():
+            print('Updating parameters of the master model')
             delta = pickle.loads(request.data)
             if self.mode == 'asynchronous':
                 self.lock.acquire_write()
