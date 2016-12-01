@@ -169,7 +169,6 @@ class SparkModel(object):
 
         @app.route('/update', methods=['POST'])
         def update_parameters():
-            print('Updating parameters of the master model')
             delta = pickle.loads(request.data)
             if self.mode == 'asynchronous':
                 self.lock.acquire_write()
@@ -179,7 +178,7 @@ class SparkModel(object):
                 constraints = [empty for x in self.weights]
             self.weights = self.optimizer.get_updates(self.weights, constraints, delta)
 
-            if not self.model_callbacks:
+            if self.model_callbacks:
                 for model_callback in self.model_callbacks:
                     model_callback.on_update_parameters(spark_model=self)
 
