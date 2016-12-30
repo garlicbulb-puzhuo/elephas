@@ -107,7 +107,7 @@ class SparkModel(object):
         return master_url
 
     def get_train_config(self, nb_epoch, batch_size,
-                         verbose, validation_split, iteration):
+                         verbose, validation_split):
         '''
         Get configuration of training parameters
         '''
@@ -116,7 +116,6 @@ class SparkModel(object):
         train_config['batch_size'] = batch_size
         train_config['verbose'] = verbose
         train_config['validation_split'] = validation_split
-        train_config['iteration'] = iteration
         return train_config
 
     def get_config(self):
@@ -226,10 +225,10 @@ class SparkModel(object):
             self.start_server()
         yaml = self.master_network.to_yaml()
         train_config = self.get_train_config(nb_epoch, batch_size,
-                                             verbose, validation_split, iteration)
+                                             verbose, validation_split)
         if self.mode in ['asynchronous', 'hogwild']:
             worker = AsynchronousSparkWorker(
-                yaml, train_config, self.frequency, master_url,
+                yaml, train_config, iteration, self.frequency, master_url,
                 self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
                 callbacks, worker_callbacks
             )
@@ -301,10 +300,11 @@ class AsynchronousSparkWorker(object):
     Asynchronous Spark worker. This code will be executed on workers.
     '''
 
-    def __init__(self, yaml, train_config, frequency, master_url, master_optimizer, master_loss, master_metrics, custom_objects, callbacks=[],
+    def __init__(self, yaml, train_config, iteration, frequency, master_url, master_optimizer, master_loss, master_metrics, custom_objects, callbacks=[],
                  worker_callbacks=[]):
         self.yaml = yaml
         self.train_config = train_config
+        self.iteration = iteration
         self.frequency = frequency
         self.master_url = master_url
         self.master_optimizer = master_optimizer
@@ -337,9 +337,6 @@ class AsynchronousSparkWorker(object):
         batches = [(i*batch_size, min(nb_train_sample, (i+1)*batch_size)) for i in range(0, nb_batch)]
 
         if self.frequency == 'epoch':
-            # Added by puzhuo
-            iteration = self.train_config['iteration']
-
             for epoch in range(nb_epoch):
                 weights_before_training = get_server_weights(self.master_url)
                 model.set_weights(weights_before_training)
@@ -349,7 +346,7 @@ class AsynchronousSparkWorker(object):
 
                 if self.worker_callbacks and history:
                     for worker_callback in self.worker_callbacks:
-                        worker_callback.on_epoch_end(epoch=epoch, iteration=iteration, model=model, history=history)
+                        worker_callback.on_epoch_end(epoch=epoch, iteration=self.iteration, model=model, history=history)
 
                 weights_after_training = model.get_weights()
                 deltas = subtract_params(weights_before_training, weights_after_training)
