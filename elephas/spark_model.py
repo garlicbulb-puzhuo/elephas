@@ -107,7 +107,7 @@ class SparkModel(object):
         return master_url
 
     def get_train_config(self, nb_epoch, batch_size,
-                         verbose, validation_split):
+                         verbose, validation_split, iteration):
         '''
         Get configuration of training parameters
         '''
@@ -116,6 +116,7 @@ class SparkModel(object):
         train_config['batch_size'] = batch_size
         train_config['verbose'] = verbose
         train_config['validation_split'] = validation_split
+        train_config['iteration'] = iteration
         return train_config
 
     def get_config(self):
@@ -178,6 +179,7 @@ class SparkModel(object):
                 constraints = [empty for x in self.weights]
             self.weights = self.optimizer.get_updates(self.weights, constraints, delta)
 
+            # Added by puzhuo
             if self.model_callbacks:
                 for model_callback in self.model_callbacks:
                     model_callback.on_update_parameters(spark_model=self)
@@ -201,7 +203,7 @@ class SparkModel(object):
         '''
         return self.master_network.predict_classes(data)
 
-    def train(self, rdd, nb_epoch=10, batch_size=32,
+    def train(self, rdd, iteration, nb_epoch=10, batch_size=32,
               verbose=0, validation_split=0.1, callbacks=[], worker_callbacks=[]):
         '''
         Train an elephas model.
@@ -214,7 +216,7 @@ class SparkModel(object):
         else:
             print("""Choose from one of the modes: asynchronous, synchronous or hogwild""")
 
-    def _train(self, rdd, nb_epoch=10, batch_size=32, verbose=0,
+    def _train(self, rdd, iteration, nb_epoch=10, batch_size=32, verbose=0,
                validation_split=0.1, master_url='localhost:5000', callbacks=[], worker_callbacks=[]):
         '''
         Protected train method to make wrapping of modes easier
@@ -224,7 +226,7 @@ class SparkModel(object):
             self.start_server()
         yaml = self.master_network.to_yaml()
         train_config = self.get_train_config(nb_epoch, batch_size,
-                                             verbose, validation_split)
+                                             verbose, validation_split, iteration)
         if self.mode in ['asynchronous', 'hogwild']:
             worker = AsynchronousSparkWorker(
                 yaml, train_config, self.frequency, master_url,
@@ -243,11 +245,13 @@ class SparkModel(object):
                 constraints = self.master_network.constraints
                 new_parameters = self.optimizer.get_updates(self.weights, constraints, delta)
 
+        # Updated by puzhuo
         self.update_weights(weights=new_parameters)
 
         if self.mode in ['asynchronous', 'hogwild']:
             self.stop_server()
 
+    # Added by puzhuo
     def update_weights(self, weights=None):
         if weights is not None:
             self.master_network.set_weights(weights)
@@ -256,7 +260,7 @@ class SparkModel(object):
 
 
 class SparkWorkerCallback(object):
-    def on_epoch_end(self, epoch, model, history):
+    def on_epoch_end(self, epoch, iteration, model, history):
         pass
 
 
@@ -333,6 +337,9 @@ class AsynchronousSparkWorker(object):
         batches = [(i*batch_size, min(nb_train_sample, (i+1)*batch_size)) for i in range(0, nb_batch)]
 
         if self.frequency == 'epoch':
+            # Added by puzhuo
+            iteration = self.train_config['iteration']
+
             for epoch in range(nb_epoch):
                 weights_before_training = get_server_weights(self.master_url)
                 model.set_weights(weights_before_training)
@@ -342,7 +349,7 @@ class AsynchronousSparkWorker(object):
 
                 if self.worker_callbacks and history:
                     for worker_callback in self.worker_callbacks:
-                        worker_callback.on_epoch_end(epoch=epoch, model=model, history=history)
+                        worker_callback.on_epoch_end(epoch=epoch, iteration=iteration, model=model, history=history)
 
                 weights_after_training = model.get_weights()
                 deltas = subtract_params(weights_before_training, weights_after_training)
