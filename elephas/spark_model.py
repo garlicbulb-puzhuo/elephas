@@ -212,7 +212,7 @@ class SparkModel(object):
         master_url = self.determine_master_with_port()
 
         if self.mode in ['asynchronous', 'synchronous', 'hogwild']:
-            self._train(rdd, nb_epoch, batch_size, verbose, validation_split, master_url, callbacks, worker_callbacks)
+            self._train(rdd, iteration, nb_epoch, batch_size, verbose, validation_split, master_url, callbacks, worker_callbacks)
         else:
             print("""Choose from one of the modes: asynchronous, synchronous or hogwild""")
 
