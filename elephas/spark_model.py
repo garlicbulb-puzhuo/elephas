@@ -262,6 +262,9 @@ class SparkWorkerCallback(object):
     def on_epoch_end(self, epoch, iteration, model, history):
         pass
 
+    def on_epoch_start(self, epoch, iteration, model):
+        pass
+
 
 class SparkWorker(object):
     '''
@@ -340,6 +343,11 @@ class AsynchronousSparkWorker(object):
             for epoch in range(nb_epoch):
                 weights_before_training = get_server_weights(self.master_url)
                 model.set_weights(weights_before_training)
+
+                if self.worker_callbacks:
+                    for worker_callback in self.worker_callbacks:
+                    worker_callback.on_epoch_start(epoch=epoch, iteration=self.iteration, model=model)
+
                 self.train_config['nb_epoch'] = 1
                 if x_train.shape[0] > batch_size:
                     history = model.fit(x_train, y_train, callbacks=self.callbacks, **self.train_config)
