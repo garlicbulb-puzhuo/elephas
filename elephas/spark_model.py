@@ -346,7 +346,7 @@ class AsynchronousSparkWorker(object):
 
                 if self.worker_callbacks:
                     for worker_callback in self.worker_callbacks:
-                    worker_callback.on_epoch_start(epoch=epoch, iteration=self.iteration, model=model)
+                        worker_callback.on_epoch_start(epoch=epoch, iteration=self.iteration, model=model)
 
                 self.train_config['nb_epoch'] = 1
                 if x_train.shape[0] > batch_size:
