@@ -203,7 +203,7 @@ class SparkModel(object):
         return self.master_network.predict_classes(data)
 
     def train(self, rdd, iteration, nb_epoch=10, batch_size=32,
-              verbose=0, validation_split=0.1, callbacks=[], worker_callbacks=[], spark_worker_class=None):
+              verbose=0, validation_split=0.1, callbacks=[], worker_callbacks=[], spark_worker_class=None, spark_worker_config=None):
         '''
         Train an elephas model.
         '''
@@ -216,7 +216,7 @@ class SparkModel(object):
             print("""Choose from one of the modes: asynchronous, synchronous or hogwild""")
 
     def _train(self, rdd, iteration, nb_epoch=10, batch_size=32, verbose=0,
-               validation_split=0.1, master_url='localhost:5000', callbacks=[], worker_callbacks=[], spark_worker_class=None):
+               validation_split=0.1, master_url='localhost:5000', callbacks=[], worker_callbacks=[], spark_worker_class=None, spark_worker_config=None):
         '''
         Protected train method to make wrapping of modes easier
         '''
@@ -244,7 +244,7 @@ class SparkModel(object):
                 worker_klass = my_import(spark_worker_class)
                 worker = worker_klass(yaml, train_config, iteration, self.frequency, master_url,
                                       self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
-                                      callbacks, worker_callbacks)
+                                      callbacks, worker_callbacks, spark_worker_config)
 
             rdd.mapPartitions(worker.train).collect()
             new_parameters = get_server_weights(master_url)
