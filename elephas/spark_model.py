@@ -234,14 +234,8 @@ class SparkModel(object):
                     callbacks, worker_callbacks
                 )
             else:
-                def my_import(name):
-                    components = name.split('.')
-                    mod = __import__(components[0])
-                    for comp in components[1:]:
-                        mod = getattr(mod, comp)
-                    return mod
-
-                worker_klass = my_import(spark_worker_class)
+                from pydoc import locate
+                worker_klass = locate(spark_worker_class)
                 worker = worker_klass(yaml, train_config, iteration, self.frequency, master_url,
                                       self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
                                       callbacks, worker_callbacks, spark_worker_config)
