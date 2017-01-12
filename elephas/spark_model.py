@@ -61,6 +61,7 @@ class SparkModel(object):
                  custom_objects=None,
                  master_server_port=None,
                  model_callbacks=[],
+                 spark_worker_class=None,
                  *args, **kwargs):
 
 
@@ -85,6 +86,7 @@ class SparkModel(object):
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
         self.model_callbacks = model_callbacks
+        self.spark_worker_class = spark_worker_class
 
         if master_server_port is None:
             self.master_server_port = 5000
@@ -227,11 +229,25 @@ class SparkModel(object):
         train_config = self.get_train_config(nb_epoch, batch_size,
                                              verbose, validation_split)
         if self.mode in ['asynchronous', 'hogwild']:
-            worker = AsynchronousSparkWorker(
-                yaml, train_config, iteration, self.frequency, master_url,
-                self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
-                callbacks, worker_callbacks
-            )
+            if self.spark_worker_class is None:
+                worker = AsynchronousSparkWorker(
+                    yaml, train_config, iteration, self.frequency, master_url,
+                    self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
+                    callbacks, worker_callbacks
+                )
+            else:
+                def my_import(name):
+                    components = name.split('.')
+                    mod = __import__(components[0])
+                    for comp in components[1:]:
+                        mod = getattr(mod, comp)
+                    return mod
+
+                worker_klass = my_import(self.spark_worker_class)
+                worker = worker_klass(yaml, train_config, iteration, self.frequency, master_url,
+                                      self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
+                                      callbacks, worker_callbacks)
+
             rdd.mapPartitions(worker.train).collect()
             new_parameters = get_server_weights(master_url)
         elif self.mode == 'synchronous':
