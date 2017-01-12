@@ -61,7 +61,6 @@ class SparkModel(object):
                  custom_objects=None,
                  master_server_port=None,
                  model_callbacks=[],
-                 spark_worker_class=None,
                  *args, **kwargs):
 
 
@@ -86,7 +85,6 @@ class SparkModel(object):
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
         self.model_callbacks = model_callbacks
-        self.spark_worker_class = spark_worker_class
 
         if master_server_port is None:
             self.master_server_port = 5000
@@ -205,7 +203,7 @@ class SparkModel(object):
         return self.master_network.predict_classes(data)
 
     def train(self, rdd, iteration, nb_epoch=10, batch_size=32,
-              verbose=0, validation_split=0.1, callbacks=[], worker_callbacks=[]):
+              verbose=0, validation_split=0.1, callbacks=[], worker_callbacks=[], spark_worker_class=None):
         '''
         Train an elephas model.
         '''
@@ -213,12 +211,12 @@ class SparkModel(object):
         master_url = self.determine_master_with_port()
 
         if self.mode in ['asynchronous', 'synchronous', 'hogwild']:
-            self._train(rdd, iteration, nb_epoch, batch_size, verbose, validation_split, master_url, callbacks, worker_callbacks)
+            self._train(rdd, iteration, nb_epoch, batch_size, verbose, validation_split, master_url, callbacks, worker_callbacks, spark_worker_class)
         else:
             print("""Choose from one of the modes: asynchronous, synchronous or hogwild""")
 
     def _train(self, rdd, iteration, nb_epoch=10, batch_size=32, verbose=0,
-               validation_split=0.1, master_url='localhost:5000', callbacks=[], worker_callbacks=[]):
+               validation_split=0.1, master_url='localhost:5000', callbacks=[], worker_callbacks=[], spark_worker_class=None):
         '''
         Protected train method to make wrapping of modes easier
         '''
@@ -229,7 +227,7 @@ class SparkModel(object):
         train_config = self.get_train_config(nb_epoch, batch_size,
                                              verbose, validation_split)
         if self.mode in ['asynchronous', 'hogwild']:
-            if self.spark_worker_class is None:
+            if spark_worker_class is None:
                 worker = AsynchronousSparkWorker(
                     yaml, train_config, iteration, self.frequency, master_url,
                     self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
@@ -243,7 +241,7 @@ class SparkModel(object):
                         mod = getattr(mod, comp)
                     return mod
 
-                worker_klass = my_import(self.spark_worker_class)
+                worker_klass = my_import(spark_worker_class)
                 worker = worker_klass(yaml, train_config, iteration, self.frequency, master_url,
                                       self.master_optimizer, self.master_loss, self.master_metrics, self.custom_objects,
                                       callbacks, worker_callbacks)
